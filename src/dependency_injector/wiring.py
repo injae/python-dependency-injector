@@ -36,6 +36,21 @@ if sys.version_info >= (3, 9):
 else:
     GenericAlias = None
 
+if sys.version_info >= (3, 9):
+    AnnotatedTypeNames = {"AnnotatedMeta", "_AnnotatedAlias"}
+
+    def _annotated_to_marker(parameter: inspect.Parameter) -> Any:
+        marker = parameter.default
+        if type(parameter.annotation).__name__ in AnnotatedTypeNames:
+            marker = parameter.annotation.__metadata__[0]
+
+        return marker
+
+else:
+
+    def _annotated_to_marker(parameter: inspect.Parameter) -> Any:
+        return parameter.default
+
 
 try:
     import fastapi.params
@@ -573,11 +588,11 @@ def _fetch_reference_injections(  # noqa: C901
     injections = {}
     closing = {}
     for parameter_name, parameter in signature.parameters.items():
-        if not isinstance(parameter.default, _Marker) \
-                and not _is_fastapi_depends(parameter.default):
-            continue
+        marker = _annotated_to_marker(parameter)
 
-        marker = parameter.default
+        if not isinstance(marker, _Marker) \
+                and not _is_fastapi_depends(marker):
+            continue
 
         if _is_fastapi_depends(marker):
             marker = marker.dependency
